@@ -6,7 +6,7 @@
 <style>
 /* Layout: one-screen instrument — map fills, clock/status overlay top-left, two-lane timeline docked at the bottom */
 :root{
-  --bg:#0b1220; --sea:#0d1626; --land:#172235; --border:#2a3953; --state:#223049;
+  --bg:#0b1220; --sea:#0d1626; --land:#141d2e; --us:#22314b; --border:#33445f; --state:#3a4d6c;
   --fg:#e6ebf3; --muted:#8a97ad; --faint:#55627a;
   --plane:#ffc861; --plane-dim:#7f93b5; --stop:#ff5a4e; --stop-bg:rgba(255,90,78,.13);
   --panel:rgba(11,18,32,.82);
@@ -27,6 +27,7 @@ body{background:var(--bg);color:var(--fg);font-family:var(--body);margin:0;overf
 h1{font-family:var(--display);font-weight:700;font-size:clamp(24px,3.2vw,38px);line-height:1;margin:0;letter-spacing:.01em;text-wrap:balance}
 .clock{font-family:var(--mono);display:flex;gap:18px;align-items:baseline}
 .clock .big{font-size:clamp(26px,3.4vw,40px);font-weight:500;font-variant-numeric:tabular-nums;line-height:1}
+.clock .ap{font-size:.45em;margin-left:4px;color:var(--muted)}
 .clock .small{font-size:13px;color:var(--muted);font-variant-numeric:tabular-nums}
 .status{display:inline-flex;align-items:center;gap:8px;font-family:var(--display);font-weight:600;font-size:16px;letter-spacing:.06em;text-transform:uppercase;padding:4px 10px;border-radius:3px;border:1px solid var(--border);color:var(--muted);background:var(--panel)}
 .status i{width:8px;height:8px;border-radius:50%;background:var(--plane)}
@@ -60,29 +61,29 @@ button:focus-visible,select:focus-visible,#chart:focus-visible{outline:2px solid
 
 <div class="app">
   <div class="map">
-    <canvas id="map" aria-label="Карта самолётов над США"></canvas>
-    <div id="loading">Загружаю 1,36 млн точек ADS‑B…</div>
+    <canvas id="map" aria-label="Map of aircraft over the US"></canvas>
+    <div id="loading">Loading 1.36 million ADS‑B positions…</div>
     <div class="hud">
       <div class="title">
-        <span class="eyebrow">FAA Nationwide Ground Stop · 13.11.2026</span>
-        <h1>Небо над США пустеет</h1>
+        <span class="eyebrow">FAA Nationwide Ground Stop · Nov 13, 2026</span>
+        <h1>The Day US Skies Emptied</h1>
       </div>
       <div class="clock">
-        <div><div class="big" id="et">--:--</div><div class="small">ET (Нью‑Йорк)</div></div>
+        <div><div class="big"><span id="et">--:--</span><span class="ap" id="etap"></span></div><div class="small">ET (New York)</div></div>
         <div><div class="big" id="utc" style="color:var(--muted)">--:--</div><div class="small">UTC</div></div>
       </div>
-      <div class="count"><b id="cnt">—</b><span>рейсов авиакомпаний в воздухе над континентальными США</span></div>
-      <div class="status" id="status"><i></i><span id="statusText">Обычный трафик</span></div>
+      <div class="count"><b id="cnt">—</b><span>airline flights airborne over the contiguous US</span></div>
+      <div class="status" id="status"><i></i><span id="statusText">Normal traffic</span></div>
     </div>
-    <div class="legend"><span><i style="background:var(--plane)"></i>авиакомпании</span><span><i style="background:var(--plane-dim)"></i>прочие (бизнес, GA, военные)</span></div>
-    <div class="foot">Данные: ADS‑B, <a href="https://adsb.lol" target="_blank" rel="noopener">adsb.lol</a> (ODbL). Позиции раз в минуту. Архив кончается в 19:00 ET; запрет сняли в 20:15 ET.</div>
+    <div class="legend"><span><i style="background:var(--plane)"></i>airlines</span><span><i style="background:var(--plane-dim)"></i>other (bizjet, GA, military)</span></div>
+    <div class="foot">Data: ADS‑B, <a href="https://adsb.lol" target="_blank" rel="noopener">adsb.lol</a> (ODbL). One position per minute. Archive ends at 7:00 pm ET; the ground stop was lifted at 8:15 pm ET.</div>
   </div>
   <div class="dock">
     <div class="controls">
-      <button id="play" aria-label="Пауза">❚❚</button>
-      <select id="speed" aria-label="Скорость"><option value="0.5">0.5×</option><option value="1" selected>1×</option><option value="2">2×</option><option value="4">4×</option></select>
+      <button id="play" aria-label="Pause">❚❚</button>
+      <select id="speed" aria-label="Speed"><option value="0.5">0.5×</option><option value="1" selected>1×</option><option value="2">2×</option><option value="4">4×</option></select>
     </div>
-    <div class="chartwrap"><canvas id="chart" tabindex="0" aria-label="Шкала времени: самолёты в воздухе и взлёты"></canvas></div>
+    <div class="chartwrap"><canvas id="chart" tabindex="0" aria-label="Timeline: aircraft airborne and takeoffs"></canvas></div>
   </div>
 </div>
 
@@ -93,7 +94,7 @@ button:focus-visible,select:focus-visible,#chart:focus-visible{outline:2px solid
 const LAT0=14,LAT1=58,LON0=-135,LON1=-52;
 const STOP_UTC=Date.UTC(2026,10,13,20,54)/1000; // FAA: 3:54 pm ET
 const css=getComputedStyle(document.documentElement), C=n=>css.getPropertyValue(n).trim();
-const col={sea:C('--sea'),land:C('--land'),border:C('--border'),state:C('--state'),fg:C('--fg'),muted:C('--muted'),faint:C('--faint'),plane:C('--plane'),dim:C('--plane-dim'),stop:C('--stop'),stopBg:C('--stop-bg')};
+const col={sea:C('--sea'),land:C('--land'),us:C('--us'),border:C('--border'),state:C('--state'),fg:C('--fg'),muted:C('--muted'),faint:C('--faint'),plane:C('--plane'),dim:C('--plane-dim'),stop:C('--stop'),stopBg:C('--stop-bg')};
 
 async function bytes(url){
   const txt=(await (await fetch(url)).text()).trim();
@@ -131,6 +132,7 @@ const X=new Float32Array(nP), Y=new Float32Array(nP);
 
 // ---- map
 const land=topojson.feature(world,world.objects.countries);
+const us=topojson.feature(states,states.objects.nation);
 const borders=topojson.mesh(world,world.objects.countries,(a,b)=>a!==b);
 const stateMesh=topojson.mesh(states,states.objects.states,(a,b)=>a!==b);
 const mapC=document.getElementById('map'), mctx=mapC.getContext('2d');
@@ -140,14 +142,15 @@ function layout(){
   dpr=Math.min(window.devicePixelRatio||1,2);
   const r=mapC.getBoundingClientRect(); W=r.width; H=r.height;
   for(const c of [mapC,base]){c.width=Math.round(W*dpr);c.height=Math.round(H*dpr)}
-  const topPad=W<640?150:100;
+  const topPad=W<640?150:80;
   proj=d3.geoConicEqualArea().parallels([29.5,45.5]).rotate([96,0]).center([0,38])
-    .fitExtent([[10,topPad],[W-10,H-20]],{type:'MultiPoint',coordinates:[[-124,25],[-124,49],[-67,49],[-67,25],[-96,24.5],[-96,49.5]]});
+    .fitExtent([[4,topPad],[W-4,H-8]],{type:'MultiPoint',coordinates:[[-124,25],[-124,49],[-67,49],[-67,25],[-96,24.5],[-96,49.5]]});
   bctx.setTransform(dpr,0,0,dpr,0,0);
   bctx.fillStyle=col.sea; bctx.fillRect(0,0,W,H);
   const path=d3.geoPath(proj,bctx);
   bctx.beginPath(); path(land); bctx.fillStyle=col.land; bctx.fill();
-  bctx.beginPath(); path(stateMesh); bctx.strokeStyle=col.state; bctx.lineWidth=.6; bctx.stroke();
+  bctx.beginPath(); path(us); bctx.fillStyle=col.us; bctx.fill();
+  bctx.beginPath(); path(stateMesh); bctx.strokeStyle=col.state; bctx.lineWidth=.8; bctx.stroke();
   bctx.beginPath(); path(borders); bctx.strokeStyle=col.border; bctx.lineWidth=1; bctx.stroke();
   for(let k=0;k<nP;k++){const p=proj([lon[k],lat[k]]);X[k]=p?p[0]:-1e4;Y[k]=p?p[1]:-1e4}
   layoutChart(); dirty=true;
@@ -167,6 +170,7 @@ function layoutChart(){
   const r=chart.getBoundingClientRect(); CW=r.width; CH=r.height;
   chart.width=Math.round(CW*dpr); chart.height=Math.round(CH*dpr);
 }
+function fmt12(ts,short){const d=new Date((ts-5*3600)*1000);const h=d.getUTCHours(),m=d.getUTCMinutes(),ap=h<12?' am':' pm',h12=(h+11)%12+1;return short&&!m?h12+ap:h12+':'+String(m).padStart(2,'0')+(short?ap:'')}
 function fmt(ts,off){const d=new Date((ts+off*3600)*1000);return String(d.getUTCHours()).padStart(2,'0')+':'+String(d.getUTCMinutes()).padStart(2,'0')}
 function drawChart(t){
   const c=cctx; c.setTransform(dpr,0,0,dpr,0,0); c.clearRect(0,0,CW,CH);
@@ -189,28 +193,28 @@ function drawChart(t){
   }
   // labels
   c.font='11px "IBM Plex Mono",monospace'; c.textBaseline='top'; c.fillStyle=col.muted; c.textAlign='left';
-  c.fillText('в воздухе (авиакомпании, США)',padL+4,y1+1);
-  c.fillText('взлёты за 5 мин',padL+4,y2+1);
+  c.fillText('airborne (airlines, US)',padL+4,y1+1);
+  c.fillText('takeoffs per 5 min',padL+4,y2+1);
   c.textAlign='right';
-  c.fillText(airMax.toLocaleString('ru-RU'),padL-6,y1+10);
+  c.fillText(airMax.toLocaleString('en-US'),padL-6,y1+10);
   c.fillText(String(tkoMax),padL-6,y2+8);
   // time axis (ET)
   c.textAlign='center'; c.fillStyle=col.muted;
-  for(let m=0;m<N;m+=60){c.fillText(fmt(w0+m*60,-5),xOf(m),CH-axisH+3);c.fillStyle=col.faint;c.fillRect(xOf(m),CH-axisH,1,3);c.fillStyle=col.muted}
+  for(let m=0;m<N;m+=60){c.fillText(fmt12(w0+m*60,true),xOf(m),CH-axisH+3);c.fillStyle=col.faint;c.fillRect(xOf(m),CH-axisH,1,3);c.fillStyle=col.muted}
   c.textAlign='left'; c.fillText('ET',xOf(N-1)-14,CH-axisH+3);
   // stop marker
   c.fillStyle=col.stop; c.fillRect(xOf(stopM),0,1.5,CH-axisH);
-  c.textAlign='left'; c.fillText(CW<600?'15:54 FAA':'15:54 ET приказ FAA',xOf(stopM)+5,y1+h1-12);
+  c.textAlign='left'; c.fillText(CW<600?'3:54 FAA':'3:54 pm ET FAA order',xOf(stopM)+5,y1+h1-12);
   // observed collapse of departures (from the data)
   const dx=xOf(DROP_M); c.fillStyle=col.muted; c.fillRect(dx,y2,1,h2);
-  c.textAlign='left'; c.fillText(CW<600?'15:38':'15:38 взлёты встали',dx+4,y2+1);
+  if(CW>=600){c.textAlign='left'; c.fillText('3:38 pm takeoffs stop',dx+4,y2+1);}
   // playhead
   const px=xOf(t); c.fillStyle=col.fg; c.fillRect(px-0.75,0,1.5,CH-axisH);
   c.beginPath(); c.arc(px,y1+h1-air[Math.floor(t)]/airMax*(h1-14),3.5,0,7); c.fill();
 }
 
 // ---- animation
-const etEl=document.getElementById('et'), utcEl=document.getElementById('utc'), cntEl=document.getElementById('cnt');
+const etAp=document.getElementById('etap'), etEl=document.getElementById('et'), utcEl=document.getElementById('utc'), cntEl=document.getElementById('cnt');
 const stEl=document.getElementById('status'), stTxt=document.getElementById('statusText');
 const playBtn=document.getElementById('play'), speedSel=document.getElementById('speed');
 const reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -242,11 +246,11 @@ function drawMap(t){
 function render(){
   drawMap(t); drawChart(t);
   const ts=w0+t*60;
-  etEl.textContent=fmt(ts,-5); utcEl.textContent=fmt(ts,0);
-  cntEl.textContent=air[Math.floor(t)].toLocaleString('ru-RU');
+  etEl.textContent=fmt12(ts,false); etAp.textContent=new Date((ts-5*3600)*1000).getUTCHours()<12?'am':'pm'; utcEl.textContent=fmt(ts,0);
+  cntEl.textContent=air[Math.floor(t)].toLocaleString('en-US');
   const on=ts>=STOP_UTC;
   stEl.classList.toggle('on',on);
-  stTxt.textContent=on?('Ground stop · '+Math.floor((ts-STOP_UTC)/3600)+' ч '+String(Math.floor((ts-STOP_UTC)%3600/60)).padStart(2,'0')+' мин'):'Обычный трафик';
+  stTxt.textContent=on?('Ground stop · '+Math.floor((ts-STOP_UTC)/3600)+'h '+String(Math.floor((ts-STOP_UTC)%3600/60)).padStart(2,'0')+'m'):'Normal traffic';
 }
 function tick(now){
   const dt=Math.min(0.1,(now-last)/1000); last=now;
@@ -254,7 +258,7 @@ function tick(now){
   if(dirty){render();dirty=false}
   requestAnimationFrame(tick);
 }
-function setPlaying(p){playing=p; if(p&&t>=N-1)t=0; playBtn.textContent=p?'❚❚':'▶'; playBtn.setAttribute('aria-label',p?'Пауза':'Воспроизвести')}
+function setPlaying(p){playing=p; if(p&&t>=N-1)t=0; playBtn.textContent=p?'❚❚':'▶'; playBtn.setAttribute('aria-label',p?'Pause':'Play')}
 playBtn.onclick=()=>setPlaying(!playing);
 let drag=false;
 const seek=e=>{const r=chart.getBoundingClientRect();t=mOf(e.clientX-r.left);dirty=true};

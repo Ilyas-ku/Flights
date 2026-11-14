@@ -1,6 +1,6 @@
 # US Ground Stop, 13 Nov 2026
 
-Animated map of real ADS-B traffic over the US during the FAA nationwide ground stop (15:54–20:15 ET).
+Animated map of real ADS-B traffic over the US during the FAA nationwide ground stop (3:54–8:15 pm ET).
 
 - `site/` — interactive page (serve with `python3 -m http.server` inside `site/`)
 - `video/ground_stop_2026-11-13.mp4` — 1080p render
