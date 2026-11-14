@@ -8,7 +8,7 @@
 :root{
   --bg:#0b1220; --sea:#0d1626; --land:#141d2e; --us:#22314b; --border:#33445f; --state:#3a4d6c;
   --fg:#e6ebf3; --muted:#8a97ad; --faint:#55627a;
-  --plane:#ffc861; --plane-dim:#7f93b5; --stop:#ff5a4e; --stop-bg:rgba(255,90,78,.13);
+  --plane:#ffc861; --plane-dim:#7f93b5; --stop:#ff5a4e; --stop-bg:rgba(255,90,78,.13); --lift:#5fd39a;
   --panel:rgba(11,18,32,.82);
   --display:"Barlow Condensed","Arial Narrow",system-ui,sans-serif;
   --body:"Barlow",system-ui,-apple-system,sans-serif;
@@ -33,6 +33,8 @@ h1{font-family:var(--display);font-weight:700;font-size:clamp(24px,3.2vw,38px);l
 .status i{width:8px;height:8px;border-radius:50%;background:var(--plane)}
 .status.on{color:var(--stop);border-color:var(--stop)}
 .status.on i{background:var(--stop);animation:blink 1s steps(2) infinite}
+.status.lift{color:var(--lift);border-color:var(--lift)}
+.status.lift i{background:var(--lift)}
 @keyframes blink{50%{opacity:.25}}
 .count{display:flex;flex-direction:column;gap:2px}
 .count b{font-family:var(--display);font-size:clamp(28px,3.6vw,44px);font-weight:600;line-height:1;font-variant-numeric:tabular-nums;color:var(--plane)}
@@ -76,7 +78,7 @@ button:focus-visible,select:focus-visible,#chart:focus-visible{outline:2px solid
       <div class="status" id="status"><i></i><span id="statusText">Normal traffic</span></div>
     </div>
     <div class="legend"><span><i style="background:var(--plane)"></i>airlines</span><span><i style="background:var(--plane-dim)"></i>other (bizjet, GA, military)</span></div>
-    <div class="foot">Data: ADS‑B, <a href="https://adsb.lol" target="_blank" rel="noopener">adsb.lol</a> (ODbL). One position per minute. Archive ends at 7:00 pm ET; the ground stop was lifted at 8:15 pm ET.</div>
+    <div class="foot">Data: ADS‑B, <a href="https://adsb.lol" target="_blank" rel="noopener">adsb.lol</a> (ODbL). One position per minute.<span id="archNote"> Archive ends at 7:00 pm ET; the ground stop was lifted at 8:15 pm ET.</span></div>
   </div>
   <div class="dock">
     <div class="controls">
@@ -93,8 +95,9 @@ button:focus-visible,select:focus-visible,#chart:focus-visible{outline:2px solid
 (async function(){
 const LAT0=14,LAT1=58,LON0=-135,LON1=-52;
 const STOP_UTC=Date.UTC(2026,10,13,20,54)/1000; // FAA: 3:54 pm ET
+const LIFT_UTC=Date.UTC(2026,10,14,1,15)/1000; // lifted 8:15 pm ET
 const css=getComputedStyle(document.documentElement), C=n=>css.getPropertyValue(n).trim();
-const col={sea:C('--sea'),land:C('--land'),us:C('--us'),border:C('--border'),state:C('--state'),fg:C('--fg'),muted:C('--muted'),faint:C('--faint'),plane:C('--plane'),dim:C('--plane-dim'),stop:C('--stop'),stopBg:C('--stop-bg')};
+const col={sea:C('--sea'),land:C('--land'),us:C('--us'),border:C('--border'),state:C('--state'),fg:C('--fg'),muted:C('--muted'),faint:C('--faint'),plane:C('--plane'),dim:C('--plane-dim'),stop:C('--stop'),stopBg:C('--stop-bg'),lift:C('--lift')};
 
 async function bytes(url){
   const txt=(await (await fetch(url)).text()).trim();
@@ -165,6 +168,8 @@ let CW=0,CH=0, padL=44, padR=8;
 const xOf=m=>padL+(m/(N-1))*(CW-padL-padR);
 const mOf=x=>Math.max(0,Math.min(N-1,(x-padL)/(CW-padL-padR)*(N-1)));
 const stopM=(STOP_UTC-w0)/60;
+const liftM=(LIFT_UTC-w0)/60, hasLift=liftM<=N-1;
+document.getElementById('archNote').hidden=hasLift;
 const DROP_M=(Date.UTC(2026,10,13,20,38)/1000-w0)/60; // airline takeoffs fall from ~28/min to ~3/min in the ADS-B data
 function layoutChart(){
   const r=chart.getBoundingClientRect(); CW=r.width; CH=r.height;
@@ -177,7 +182,7 @@ function drawChart(t){
   const axisH=16, gap=6, h1=(CH-axisH-gap)*0.55, h2=(CH-axisH-gap)-h1;
   const y1=0, y2=h1+gap;
   // ground stop band
-  c.fillStyle=col.stopBg; c.fillRect(xOf(stopM),0,xOf(N-1)-xOf(stopM),CH-axisH);
+  c.fillStyle=col.stopBg; c.fillRect(xOf(stopM),0,xOf(Math.min(liftM,N-1))-xOf(stopM),CH-axisH);
   // lane 1: airborne area
   c.beginPath(); c.moveTo(xOf(0),y1+h1);
   for(let m=0;m<N;m++) c.lineTo(xOf(m),y1+h1-air[m]/airMax*(h1-14));
@@ -205,6 +210,7 @@ function drawChart(t){
   // stop marker
   c.fillStyle=col.stop; c.fillRect(xOf(stopM),0,1.5,CH-axisH);
   c.textAlign='left'; c.fillText(CW<600?'3:54 FAA':'3:54 pm ET FAA order',xOf(stopM)+5,y1+h1-12);
+  if(hasLift){c.fillStyle=col.lift; c.fillRect(xOf(liftM),0,1.5,CH-axisH); c.textAlign='left'; c.fillText(CW<600?'8:15':'8:15 pm lifted',xOf(liftM)+5,y1+h1-12);}
   // observed collapse of departures (from the data)
   const dx=xOf(DROP_M); c.fillStyle=col.muted; c.fillRect(dx,y2,1,h2);
   if(CW>=600){c.textAlign='left'; c.fillText('3:38 pm takeoffs stop',dx+4,y2+1);}
@@ -248,9 +254,10 @@ function render(){
   const ts=w0+t*60;
   etEl.textContent=fmt12(ts,false); etAp.textContent=new Date((ts-5*3600)*1000).getUTCHours()<12?'am':'pm'; utcEl.textContent=fmt(ts,0);
   cntEl.textContent=air[Math.floor(t)].toLocaleString('en-US');
-  const on=ts>=STOP_UTC;
+  const on=ts>=STOP_UTC&&ts<LIFT_UTC, lifted=ts>=LIFT_UTC;
+  stEl.classList.toggle('lift',lifted);
   stEl.classList.toggle('on',on);
-  stTxt.textContent=on?('Ground stop · '+Math.floor((ts-STOP_UTC)/3600)+'h '+String(Math.floor((ts-STOP_UTC)%3600/60)).padStart(2,'0')+'m'):'Normal traffic';
+  stTxt.textContent=on?('Ground stop · '+Math.floor((ts-STOP_UTC)/3600)+'h '+String(Math.floor((ts-STOP_UTC)%3600/60)).padStart(2,'0')+'m'):lifted?'Ground stop lifted':'Normal traffic';
 }
 function tick(now){
   const dt=Math.min(0.1,(now-last)/1000); last=now;

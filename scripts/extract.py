@@ -1,5 +1,5 @@
 """Extract 1-minute aircraft positions over North America from adsb.lol globe_history traces.
-usage: python extract.py <traces_dir> <out.json> <win_start_unix> <win_end_unix>
+usage: python extract.py <out.json> <win_start_unix> <win_end_unix> <traces_dir> [<traces_dir> ...]
 """
 import gzip, json, os, re, sys
 from multiprocessing import Pool
@@ -82,14 +82,25 @@ def init(w):
     WIN = w
 
 if __name__ == '__main__':
-    root, out, w0, w1 = sys.argv[1], sys.argv[2], int(sys.argv[3]), int(sys.argv[4])
-    files = [os.path.join(dp, f) for dp, _, fs in os.walk(root) for f in fs if f.startswith('trace_full_')]
+    # usage: extract.py out.json w0 w1 traces_dir [traces_dir ...]  (one dir per UTC day; merged by ICAO hex)
+    out, w0, w1, roots = sys.argv[1], int(sys.argv[2]), int(sys.argv[3]), sys.argv[4:]
+    files = [os.path.join(dp, f) for root in roots for dp, _, fs in os.walk(root) for f in fs if f.startswith('trace_full_')]
     print(len(files), 'files', file=sys.stderr)
-    res = []
+    merged = {}
     with Pool(os.cpu_count(), initializer=init, initargs=((w0, w1),)) as pool:
-        for i, r in enumerate(pool.imap_unordered(proc, files, chunksize=200)):
-            if r:
-                r['samples'] = {str(k): v for k, v in r['samples'].items()}
-                res.append(r)
+        for r in pool.imap_unordered(proc, files, chunksize=200):
+            if not r:
+                continue
+            m = merged.get(r['hex'])
+            if m is None:
+                merged[r['hex']] = r
+            else:
+                m['samples'].update(r['samples'])
+                m['events'] += r['events']
+                m['airline'] = m['airline'] or r['airline']
+                m['cs'] = m['cs'] or r['cs']
+    res = list(merged.values())
+    for r in res:
+        r['samples'] = {str(k): v for k, v in r['samples'].items()}
     json.dump({'w0': w0, 'w1': w1, 'aircraft': res}, open(out, 'w'))
     print(len(res), 'aircraft kept', file=sys.stderr)

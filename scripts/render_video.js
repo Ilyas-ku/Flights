@@ -7,7 +7,7 @@ const {chromium}=require('playwright');
   await p.goto('http://localhost:8765/index.html');
   await p.waitForFunction(()=>window.__seek);
   await p.addStyleTag({content:'.controls{display:none}'});
-  const N=300, step=0.5;
+  const N=await p.evaluate(()=>fetch('stats.json').then(r=>r.json()).then(s=>s.minutes)), step=0.5;
   let i=0;
   for(let m=0;m<=N-1;m+=step){
     await p.evaluate(m=>window.__seek(m),m);
