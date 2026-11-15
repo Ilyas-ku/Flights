@@ -7,4 +7,4 @@ Animated map of real ADS-B traffic over the US during the FAA nationwide ground 
 - `scripts/extract.py`, `scripts/pack.py` — build data from adsb.lol `globe_history` daily release
 - `scripts/render_video.js` — frame-by-frame render with Playwright
 
-Data: [adsb.lol](https://adsb.lol) globe_history_2026, `v2026.11.13-planes-readsb-prod-0` (ODbL). Window 19:00–24:00 UTC.
+Data: [adsb.lol](https://adsb.lol) globe_history_2026, `v2026.11.13-planes-readsb-prod-0` (ODbL). Plus `v2026.11.14-planes-readsb-prod-0`. Window 19:00–02:15 UTC (2:00–9:15 pm ET).
